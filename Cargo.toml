@@ -7,9 +7,13 @@ edition = "2021"
 anyhow = "1.0"
 clap = "1.0"
 itertools = "0.13"
+regex = "1.11"
 
 [[bin]]
 name = "d1"
 
 [[bin]]
 name = "d2"
+
+[[bin]]
+name = "d3"
