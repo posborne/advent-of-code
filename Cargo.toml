@@ -6,6 +6,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 clap = "1.0"
+itertools = "0.13"
 
 [[bin]]
 name = "d1"
+
+[[bin]]
+name = "d2"

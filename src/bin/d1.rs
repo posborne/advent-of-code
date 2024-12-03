@@ -1,9 +1,16 @@
 use std::{
-    fs::File, io::{BufRead, BufReader}, iter::zip, path::{Path, PathBuf}
+    fs::File,
+    io::{BufRead, BufReader},
+    iter::zip,
+    path::{Path, PathBuf},
 };
 
 fn parse_input<P: AsRef<Path>>(file: P) -> anyhow::Result<Vec<(i32, i32)>> {
-    let f = File::open(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("inputs").join(file.as_ref()))?;
+    let f = File::open(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("inputs")
+            .join(file.as_ref()),
+    )?;
     let buf = BufReader::new(f);
     let pairs = buf
         .lines()
