@@ -17,3 +17,6 @@ name = "d2"
 
 [[bin]]
 name = "d3"
+
+[[bin]]
+name = "d4"
