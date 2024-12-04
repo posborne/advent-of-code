@@ -91,28 +91,13 @@ mod p1 {
             diags.push(diag);
         }
 
-        println!("");
-        println!("== Diagonals ==");
-        for diag in &diags {
-            println!("{diag}");
-        }
-
         diags
     }
 
     fn tr_to_bl_diagonals(puzzle: &[String]) -> Vec<String> {
         // flipping the rows around and using the same tl->br algo
         // gives us the tr->bl results we want
-        let flipped_puzzle = puzzle
-            .iter()
-            .rev()
-            .cloned()
-            .collect::<Vec<String>>();
-
-        println!("\n== REVERSED DIAG ==\n");
-        for row in &flipped_puzzle {
-            println!("{row}");
-        }
+        let flipped_puzzle = puzzle.iter().rev().cloned().collect::<Vec<String>>();
 
         tl_to_br_diagonals(&flipped_puzzle)
     }
@@ -140,7 +125,79 @@ mod p1 {
 }
 
 mod p2 {
+    use crate::parse_input;
+
+    // In this part, we're looking for X-MAS as in "M A S" in the form
+    // of an X (sigh).  For this one, we're just going to brute search
+    // for 3x3 grids that have one of the possible valid sets of positions
+    // present
+    //
+    // Those are the following 4 combinations:
+    //
+    // M . M | S . M | S . S | M . S
+    // . A . | . A . | . A . | . A .
+    // S . S | S . M | M . M | M . S
+    //
+    // Which we'll encode as offsets from our top-left position (0, 0)
+    const PATTERNS: &[&[(usize, usize, char)]] = &[
+        &[
+            (0, 0, 'M'),
+            (0, 2, 'M'),
+            (1, 1, 'A'),
+            (2, 0, 'S'),
+            (2, 2, 'S'),
+        ],
+        &[
+            (0, 0, 'S'),
+            (0, 2, 'M'),
+            (1, 1, 'A'),
+            (2, 0, 'S'),
+            (2, 2, 'M'),
+        ],
+        &[
+            (0, 0, 'S'),
+            (0, 2, 'S'),
+            (1, 1, 'A'),
+            (2, 0, 'M'),
+            (2, 2, 'M'),
+        ],
+        &[
+            (0, 0, 'M'),
+            (0, 2, 'S'),
+            (1, 1, 'A'),
+            (2, 0, 'M'),
+            (2, 2, 'S'),
+        ],
+    ];
+
     pub fn part2() -> anyhow::Result<()> {
+        let puzzle = parse_input("d4-p1.txt")?;
+        let puzarr = puzzle
+            .into_iter()
+            .map(|r| r.chars().collect::<Vec<char>>())
+            .collect::<Vec<Vec<char>>>();
+
+        let row_count = puzarr.len();
+        let col_count = puzarr[0].len();
+        let mut matches = 0;
+        for row_idx in 0..(row_count - 2) {
+            for col_idx in 0..(col_count - 2) {
+                'pattern: for &pattern in PATTERNS {
+                    for (xoff, yoff, candidate_c) in pattern {
+                        let c = puzarr[row_idx + xoff][col_idx + yoff];
+                        if c != *candidate_c {
+                            continue 'pattern; // go to the next candidate
+                        }
+                    }
+
+                    // if we made it through, we have a match
+                    matches += 1;
+                }
+            }
+        }
+
+        println!("Found {matches} matches!");
+
         Ok(())
     }
 }
