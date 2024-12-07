@@ -205,5 +205,24 @@ fn main() -> anyhow::Result<()> {
     let visited = positions_visited(&map);
     println!("Positions Visited: {visited}");
 
+    // TODO: find the number of single obstacles we could place
+    //       into the map to cause the guard to get stuck
+    //       indefinitely.
+    //
+    // Initial reasoning:
+    //
+    // There's probably a clever solution here, but it seems like
+    // brute force will probably still work here.  We've got two
+    // problems to solve:
+    //
+    // 1. Determine halting: If we ever have a position where the
+    //    guard passes through a second time going the same direction
+    //    we've got a cycle.  Alternatively, we could go dirty and
+    //    just call it at a number of iteractions.  A BitSet for visiting
+    //    a position should be easy enough, however.
+    // 2. Starting with the successful run, we can just place obstacles
+    //    to block the cardinal direction of a move and test each of
+    //    those.
+
     Ok(())
 }
