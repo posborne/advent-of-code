@@ -10,7 +10,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, Clone, Copy)]
+use enumset::{EnumSet, EnumSetType};
+
+#[derive(Debug, EnumSetType)]
 enum Direction {
     Up,
     Down,
@@ -46,11 +48,11 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum MapPosition {
     Empty,
     Obstacle,
-    Visited,
+    Visited(EnumSet<Direction>),
     Guard(Direction),
 }
 
@@ -63,7 +65,7 @@ impl TryFrom<char> for MapPosition {
         let pos = match value {
             '.' => Self::Empty,
             '#' => Self::Obstacle,
-            'X' => Self::Visited,
+            // assumption: visited will not be present in inputs
             guard => Self::Guard(Direction::try_from(guard)?),
         };
         Ok(pos)
@@ -75,7 +77,25 @@ impl Display for MapPosition {
         let c = match *self {
             Self::Empty => '.',
             Self::Obstacle => '#',
-            Self::Visited => 'X',
+            Self::Visited(dirset) => {
+                let mapping: &[(EnumSet<Direction>, char)] = &[
+                    (EnumSet::from(Direction::Up), '^'),
+                    (EnumSet::from(Direction::Down), 'v'),
+                    (EnumSet::from(Direction::Left), '<'),
+                    (EnumSet::from(Direction::Right), '>'),
+                    ((Direction::Up | Direction::Down), '|'),
+                    ((Direction::Left | Direction::Right), '-'),
+                    ((Direction::Up | Direction::Right), 'L'),
+                    ((Direction::Up | Direction::Left), '/'), // just making stuff up now
+                    ((Direction::Down | Direction::Right), '%'),
+                    ((Direction::Down | Direction::Left), '!'),
+                ];
+
+                mapping
+                    .iter()
+                    .find_map(|(s, c)| if dirset == *s { Some(*c) } else { None })
+                    .unwrap_or_else(|| '+')
+            }
             Self::Guard(direction) => direction.as_char(),
         };
         write!(f, "{}", c)
@@ -105,8 +125,9 @@ fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Map> {
     Ok(map)
 }
 
-fn simulate_movements(mut map: Map) -> Map {
+fn simulate_movements(orig_map: &Map) -> Option<Map> {
     // find guard position
+    let mut map = orig_map.clone();
     struct GuardPosition {
         row: usize,
         col: usize,
@@ -134,10 +155,9 @@ fn simulate_movements(mut map: Map) -> Map {
     // perform the walk, updating our map until we leave the map area
     let row_count = map.len();
     let col_count = map[0].len();
+    map[guard_position.row][guard_position.col] =
+        MapPosition::Visited(EnumSet::from(guard_direction));
     loop {
-        // only required for the first case in the present impl
-        map[guard_position.row][guard_position.col] = MapPosition::Visited;
-
         let (delta_row, delta_col) = match guard_direction {
             Direction::Up => (-1, 0),
             Direction::Down => (1, 0),
@@ -149,17 +169,27 @@ fn simulate_movements(mut map: Map) -> Map {
             guard_position.row.checked_add_signed(delta_row),
             guard_position.col.checked_add_signed(delta_col),
         ) {
-            (Some(r), Some(c)) if c < col_count && r < row_count => {
-                (r as usize, c as usize)
-            }
+            (Some(r), Some(c)) if c < col_count && r < row_count => (r as usize, c as usize),
             _ => break, // the guard has left the building
         };
 
-        let next_map_element = map[next_row][next_col];
+        let next_map_element = &mut map[next_row][next_col];
         match next_map_element {
-            MapPosition::Empty | MapPosition::Visited => {
+            MapPosition::Visited(dirset) => {
+                // if we've already visited this position in the same direction, then
+                // we have a cycle.  Exit with 'None' as a sentinel for a cycle.
+                if dirset.contains(guard_direction) {
+                    return None;
+                }
+
+                // add this direction to the set
+                *next_map_element = MapPosition::Visited(*dirset | guard_direction);
+                guard_position.row = next_row;
+                guard_position.col = next_col;
+            }
+            MapPosition::Empty => {
                 // mark next spot as visited and put the guard in this pos
-                map[next_row][next_col] = MapPosition::Visited;
+                *next_map_element = MapPosition::Visited(EnumSet::from(guard_direction));
                 guard_position.row = next_row;
                 guard_position.col = next_col;
             }
@@ -178,7 +208,7 @@ fn simulate_movements(mut map: Map) -> Map {
     }
 
     // return back the map we mutated in place
-    map
+    Some(map)
 }
 
 fn print_map(map: &Map) {
@@ -192,19 +222,15 @@ fn print_map(map: &Map) {
 
 fn positions_visited(map: &Map) -> usize {
     map.iter()
-        .map(|r| r.iter().filter(|&p| matches!(*p, MapPosition::Visited)))
+        .map(|r| r.iter().filter(|&p| matches!(*p, MapPosition::Visited(_))))
         .flatten()
         .count()
 }
 
-fn main() -> anyhow::Result<()> {
-    let map = parse_input("d6-p1.txt")?;
-    print_map(&map);
-    let map = simulate_movements(map);
-    print_map(&map);
-    let visited = positions_visited(&map);
-    println!("Positions Visited: {visited}");
-
+fn find_single_obstacle_positions(
+    orig_map: &Map,
+    map_with_visits: &Map,
+) -> Vec<(usize, usize, Map)> {
     // TODO: find the number of single obstacles we could place
     //       into the map to cause the guard to get stuck
     //       indefinitely.
@@ -223,6 +249,54 @@ fn main() -> anyhow::Result<()> {
     // 2. Starting with the successful run, we can just place obstacles
     //    to block the cardinal direction of a move and test each of
     //    those.
+
+    let mut single_obstacle_positions: Vec<(usize, usize, Map)> = Vec::new();
+    let visited_positions = map_with_visits
+        .iter()
+        .enumerate()
+        .map(|(ridx, r)| {
+            r.iter().enumerate().filter_map(move |(cidx, c)| {
+                if matches!(*c, MapPosition::Visited(_)) {
+                    Some((ridx, cidx))
+                } else {
+                    None
+                }
+            })
+        })
+        .flatten()
+        .collect::<Vec<(usize, usize)>>();
+
+    for (row, col) in visited_positions {
+        // create a map with each position visited having an obstacle
+        // and see if we end up with a cycle when simulated
+        let mut map = orig_map.clone();
+        if matches!(map[row][col], MapPosition::Guard(_)) {
+            continue; // special case
+        }
+
+        map[row][col] = MapPosition::Obstacle;
+        let res = simulate_movements(&map);
+        if res.is_none() {
+            single_obstacle_positions.push((row, col, map));
+        }
+    } 
+
+    single_obstacle_positions
+}
+
+fn main() -> anyhow::Result<()> {
+    let orig_map = parse_input("d6-p1.txt")?;
+    print_map(&orig_map);
+    let map_with_visits =
+        simulate_movements(&orig_map).expect("Base map unexpectedly simulated a cycle");
+    print_map(&map_with_visits);
+    let visited = positions_visited(&map_with_visits);
+    println!("Positions Visited: {visited}");
+
+    println!("");
+    println!("");
+    let obstacle_sim_results = find_single_obstacle_positions(&orig_map, &map_with_visits);
+    println!("Single obstacle scenario count: {}", obstacle_sim_results.len());
 
     Ok(())
 }
