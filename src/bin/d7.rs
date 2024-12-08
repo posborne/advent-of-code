@@ -17,6 +17,7 @@ use std::{
 enum Operator {
     Mul,
     Add,
+    Concat,
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +26,7 @@ struct Input {
     operands: Vec<u64>,
 }
 
-fn operator_permutations(operands_len: usize) -> Vec<Vec<Operator>> {
+fn operator_permutations(operands_len: usize, with_concat: bool) -> Vec<Vec<Operator>> {
     // TODO: could definitely memoize or make assumptions that it is the same for the run...
     let mut permutations = Vec::new();
     if operands_len == 1 {
@@ -35,11 +36,14 @@ fn operator_permutations(operands_len: usize) -> Vec<Vec<Operator>> {
     if operands_len == 2 {
         permutations.push(Vec::from(&[Operator::Add]));
         permutations.push(Vec::from(&[Operator::Mul]));
+        if with_concat {
+            permutations.push(Vec::from(&[Operator::Concat]));
+        }
         return permutations;
     }
 
     // compute the next two combos and then recurse
-    let rem = operator_permutations(operands_len - 1);
+    let rem = operator_permutations(operands_len - 1, with_concat);
     for perm in rem {
         let mut add_perm = Vec::from(&[Operator::Add]);
         let mut mul_perm = Vec::from(&[Operator::Mul]);
@@ -47,6 +51,11 @@ fn operator_permutations(operands_len: usize) -> Vec<Vec<Operator>> {
         mul_perm.extend(perm.iter());
         permutations.push(add_perm);
         permutations.push(mul_perm);
+        if with_concat {
+            let mut concat_perm = Vec::from(&[Operator::Concat]);
+            concat_perm.extend(perm.iter());
+            permutations.push(concat_perm);
+        }
     }
 
     //println!("{operands_len} - {permutations:?}");
@@ -54,10 +63,10 @@ fn operator_permutations(operands_len: usize) -> Vec<Vec<Operator>> {
 }
 
 impl Input {
-    fn compute_operators(&self) -> Vec<Vec<Operator>> {
+    fn compute_operators(&self, with_concat: bool) -> Vec<Vec<Operator>> {
         let mut successful: Vec<Vec<Operator>> = Vec::new();
         //println!("");
-        'ordering: for op_ordering in operator_permutations(self.operands.len()) {
+        'ordering: for op_ordering in operator_permutations(self.operands.len(), with_concat) {
             let mut computed_res = self.operands[0];
             // print!("{}: {computed_res}", self.result);
             for (operand, operator) in self.operands[1..].iter().zip(&op_ordering) {
@@ -75,6 +84,13 @@ impl Input {
                             Some(res) => res,
                             None => { continue 'ordering } // overflow
                         }
+                    }
+                    Operator::Concat => {
+                        let concatted_str = format!("{computed_res}{operand}");
+                        computed_res = match concatted_str.parse::<u64>() {
+                            Ok(v) => v,
+                            Err(e) => { eprintln!("{e} - {concatted_str:?}"); continue 'ordering } // overflow probably
+                        };
                     }
                 }
             }
@@ -119,12 +135,24 @@ fn main() -> anyhow::Result<()> {
     let parsed_inputs = parse_input("d7-p1.txt")?;
     let functional_res_sum: u64 = parsed_inputs
         .iter()
-        .filter(|i| i.compute_operators().len() > 0)
+        .filter(|i| i.compute_operators(false).len() > 0)
         .map(|i| {
             // println!("Good -> {i:?}");
             i.result
         })
         .sum();
-    println!("Functional Sum: {functional_res_sum:?}");
+    println!("Part1 - Functional Sum: {functional_res_sum:?}");
+
+    let functional_res_sum: u64 = parsed_inputs
+        .iter()
+        .filter(|i| i.compute_operators(true).len() > 0)
+        .map(|i| {
+            // println!("Good -> {i:?}");
+            i.result
+        })
+        .sum();
+    println!("Part 2 - Functional Sum: {functional_res_sum:?}");
+
+
     Ok(())
 }
