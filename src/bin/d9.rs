@@ -11,7 +11,7 @@ struct AllocatedBlocks {
 
 #[derive(Debug, Clone)]
 struct FreeBlocks {
-    _disk_offset: usize,
+    disk_offset: usize,
     length: usize
 }
 
@@ -38,7 +38,7 @@ impl DiskMap {
                 block_id += 1;
             } else {
                 free_list.push(FreeBlocks {
-                    _disk_offset: block_offset,
+                    disk_offset: block_offset,
                     length: *len as usize,
                 });
             }
@@ -101,6 +101,48 @@ fn compact_disk(diskmap: &DiskMap) -> Vec<usize> {
     compacted
 }
 
+fn defrag_disk(diskmap: &DiskMap) -> Vec<usize> {
+    let mut allocs = VecDeque::from_iter(diskmap.allocs.iter().cloned());
+    let mut defragged_allocs: Vec<AllocatedBlocks> = Vec::new();
+    let mut frees = VecDeque::from_iter(diskmap.free_list.iter().cloned());
+
+    // the first alloc is already defragged
+    defragged_allocs.push(allocs.pop_front().unwrap());
+
+    'alloc: while let Some(alloc) = allocs.pop_back() {
+        for free in frees.iter_mut() {
+            if free.disk_offset > alloc.disk_offset {
+                defragged_allocs.push(alloc);
+                continue 'alloc;
+            }
+
+            if free.disk_offset < alloc.disk_offset && free.length >= alloc.length {
+                free.length -= alloc.length; // note: we're just leaving empties in the free list :shruggie:
+                defragged_allocs.push(AllocatedBlocks {
+                    disk_offset: free.disk_offset,
+                    id: alloc.id,
+                    length: alloc.length,
+                });
+                break;
+            }
+        }
+    }
+
+    defragged_allocs.sort_by_key(|block| block.disk_offset);
+
+    let mut defragged_disk: Vec<usize> = Vec::new();
+    for alloc in defragged_allocs {
+        // we've got a gap; we could look at the free list but we don't need to
+        while defragged_disk.len() < alloc.disk_offset {
+            defragged_disk.push(0);
+        }
+
+        (0..alloc.length).for_each(|_| defragged_disk.push(alloc.id))
+    }
+
+    defragged_disk
+}
+
 fn checksum(disk: &[usize]) -> usize {
     disk.iter().enumerate().map(|(i, id)| i * *id).sum()
 }
@@ -110,6 +152,11 @@ fn main() -> anyhow::Result<()> {
     // println!("diskmap: {:?}", diskmap);
     let compacted = compact_disk(&diskmap);
     // println!("Compacted: {compacted:?}");
-    println!("Checksum: {}", checksum(&compacted));
+    println!("Checksum Compacted: {}", checksum(&compacted));
+
+    let defragged = defrag_disk(&diskmap);
+    // println!("Defragged: {defragged:?}");
+    println!("Checksum Defragged: {}", checksum(&defragged));
+
     Ok(())
 }
