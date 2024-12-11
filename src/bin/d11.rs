@@ -1,6 +1,5 @@
 use std::{
-    fs::File,
-    path::{Path, PathBuf},
+    fs::File, path::{Path, PathBuf}
 };
 
 // with the replacement going on, at first blush I'm getting the feeling that
@@ -27,60 +26,65 @@ fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<usize>> {
 //    would become stones 10 and 0.)
 // 3. If none of the other rules apply, the stone is replaced by a new stone;
 //    the old stone's number multiplied by 2024 is engraved on the new stone.
-fn blink(input_stones: &[usize]) -> Vec<usize> {
-    let mut output = Vec::new();
-    for &stone in input_stones {
-        // Rule 1
-        if stone == 0 {
-            output.push(1);
-            continue;
-        }
-
-        // Rule 2
-        // the log base 10 of a number is the number of digits
-        let digits = stone.ilog10() + 1;
-        if digits % 2 == 0 {
-            // left digits
-            let mut num = stone;
-            let mut left = 0;
-            let mut right = 0;
-            for dig_idx in 0..digits {
-                let digit = num % 10;
-                let mid_idx = digits / 2;
-                let pow = if dig_idx < mid_idx {
-                    dig_idx
-                } else {
-                    // ex: for a 4-digit number we want to raise digit
-                    // with index 3 (the last digit) by 1.  The mid_idx
-                    // copmuted is 2 (4 / 2), so we want dig_idx - mid_idx
-                    dig_idx - mid_idx
-                };
-                num /= 10;
-                if dig_idx < mid_idx {
-                    right += digit * 10usize.pow(pow);
-                } else {
-                    left += digit * 10usize.pow(pow);
-                }
-            }
-            output.push(left);
-            output.push(right);
-            continue;
-        }
-
-        // Rule 3
-        let new_stone = stone * 2024;
-        output.push(new_stone);
+#[memoize::memoize]
+fn count(stone: usize, generation: usize) -> usize {
+    if generation == 0 {
+        return 1;
     }
 
-    output
+    // Rule 1
+    if stone == 0 {
+        return count(1, generation - 1);
+    }
+
+    // Rule 2
+    // the log base 10 of a number is the number of digits
+    let digits = stone.ilog10() + 1;
+    if digits % 2 == 0 {
+        // left digits
+        let mut num = stone;
+        let mut left = 0;
+        let mut right = 0;
+        for dig_idx in 0..digits {
+            let digit = num % 10;
+            let mid_idx = digits / 2;
+            let pow = if dig_idx < mid_idx {
+                dig_idx
+            } else {
+                // ex: for a 4-digit number we want to raise digit
+                // with index 3 (the last digit) by 1.  The mid_idx
+                // copmuted is 2 (4 / 2), so we want dig_idx - mid_idx
+                dig_idx - mid_idx
+            };
+            num /= 10;
+            if dig_idx < mid_idx {
+                right += digit * 10usize.pow(pow);
+            } else {
+                left += digit * 10usize.pow(pow);
+            }
+        }
+
+        // recurse on our left and right digits
+        return count(left, generation - 1) + count(right, generation - 1);
+    }
+
+    // Rule 3
+    count(stone * 2024, generation - 1)
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut stones = parse_input("d11.txt")?;
+    let stones = parse_input("d11.txt")?;
     println!("Stones: {stones:?}");
-    for i in 1..=25 {
-        stones = blink(&stones);
-        println!("Blink {i}: Count = {}", stones.len());
-    }
+
+    // Blink 25 times
+    println!("Part 1:");
+    let count_25: usize = stones.iter().map(|stone| count(*stone, 25)).sum();
+    println!("Blink 25: Count = {count_25}");
+
+    // Now blink another 50 times...
+    println!("\n\nPart 2:");
+    let count_75: usize = stones.iter().map(|stone| count(*stone, 75)).sum();
+    println!("Blink 75: Count = {count_75}");
+
     Ok(())
 }

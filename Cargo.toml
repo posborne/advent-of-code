@@ -10,6 +10,7 @@ clap = "1.0"
 enumset = "1.1"
 itertools = "0.13"
 regex = "1.11"
+memoize = "0.4"
 
 [[bin]]
 name = "d1"
