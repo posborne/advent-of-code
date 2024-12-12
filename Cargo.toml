@@ -1,5 +1,5 @@
 [package]
-name = "advent-of-code-2024"
+name = "aoc"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
@@ -44,3 +44,6 @@ name = "d10"
 
 [[bin]]
 name = "d11"
+
+[[bin]]
+name = "d12"
