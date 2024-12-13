@@ -1,14 +1,13 @@
 use std::{
-    fs::File, path::{Path, PathBuf}
+    fs::File,
+    path::{Path, PathBuf},
 };
 
 // with the replacement going on, at first blush I'm getting the feeling that
 // we want some kind of balanced binary tree sort of thing...  That may not
 // be right, however, so let's send it naive first.
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<usize>> {
-    let full_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let full_path = PathBuf::from(".").join("inputs").join(path);
     let s = std::io::read_to_string(File::open(full_path)?)?;
     Ok(s.split_whitespace()
         .map(|stone| stone.parse::<usize>().unwrap())

@@ -1,5 +1,6 @@
 use std::{
-    collections::{VecDeque}, path::{Path, PathBuf}
+    collections::VecDeque,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, Clone)]
@@ -12,7 +13,7 @@ struct AllocatedBlocks {
 #[derive(Debug, Clone)]
 struct FreeBlocks {
     disk_offset: usize,
-    length: usize
+    length: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -44,17 +45,12 @@ impl DiskMap {
             }
             block_offset += *len as usize;
         }
-        DiskMap {
-            allocs,
-            free_list,
-        }
+        DiskMap { allocs, free_list }
     }
 }
 
 fn parse_diskmap<P: AsRef<Path>>(path: P) -> anyhow::Result<DiskMap> {
-    let full_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let full_path = PathBuf::from(".").join("inputs").join(path);
     let contents = std::fs::read_to_string(full_path)?;
     let trimmed = contents.trim();
     let diskmap_raw = trimmed

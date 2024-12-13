@@ -6,9 +6,7 @@ use std::{
 };
 
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<Vec<char>>> {
-    let full_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let full_path = PathBuf::from(".").join("inputs").join(path);
     let f = File::open(full_path)?;
     let reader = BufReader::new(f);
     let data = reader
@@ -43,8 +41,7 @@ impl CropArea {
             return false;
         }
 
-        let (neigh_x, neigh_y) =
-            (x.checked_add_signed(x_off), y.checked_add_signed(y_off));
+        let (neigh_x, neigh_y) = (x.checked_add_signed(x_off), y.checked_add_signed(y_off));
         match (neigh_x, neigh_y) {
             (Some(nx), Some(ny)) if nx < self.row_count && ny < self.col_count => {
                 !self.members.contains(&(nx, ny))
@@ -66,9 +63,7 @@ impl CropArea {
         for (x, y) in self.members.iter().cloned() {
             let count = NEIGHBOR_OFFSETS
                 .iter()
-                .filter(|(x_off, y_off)| {
-                    self.has_perimeter_at_offset(x, y, *x_off, *y_off)
-                })
+                .filter(|(x_off, y_off)| self.has_perimeter_at_offset(x, y, *x_off, *y_off))
                 .count();
             perimeter += count;
         }

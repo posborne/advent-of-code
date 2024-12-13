@@ -5,9 +5,7 @@ use std::{
 };
 
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<Vec<i32>>> {
-    let input_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let input_path = PathBuf::from(".").join("inputs").join(path);
     let f = File::open(input_path)?;
     let reader = BufReader::new(f);
     let records = reader
@@ -81,7 +79,11 @@ mod p2 {
         };
         while let Some(cur) = series.next() {
             let is_increasing = increasing.get_or_insert_with(|| cur > prev);
-            let delta = if *is_increasing { cur - prev } else { prev - cur };
+            let delta = if *is_increasing {
+                cur - prev
+            } else {
+                prev - cur
+            };
             if delta <= 0 || delta > 3 {
                 return false;
             }

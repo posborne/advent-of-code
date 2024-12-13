@@ -1,6 +1,10 @@
-use std::{fs::File, io::BufReader, path::{Path, PathBuf}};
+use std::{
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
-const MUL_RE: &str  = r"mul\((?<a>\d+),(?<b>\d+)\)";
+const MUL_RE: &str = r"mul\((?<a>\d+),(?<b>\d+)\)";
 const DO_RE: &str = r"do\(\)";
 const DONT_RE: &str = r"don\'t\(\)";
 
@@ -24,9 +28,7 @@ mod p1 {
             let b = cap["b"].parse::<u32>()?;
             muls.push((a, b));
         }
-        let sum: u32 = muls.into_iter().map(|(a, b)| {
-            a * b
-        }).sum();
+        let sum: u32 = muls.into_iter().map(|(a, b)| a * b).sum();
         println!("Part1: Sum of muls: {sum}");
         Ok(())
     }
@@ -38,7 +40,9 @@ mod p2 {
     use super::*;
 
     pub fn part2() -> anyhow::Result<()> {
-        let combo_re = Regex::new(&format!("(?<mul>{MUL_RE})|(?<do>{DO_RE})|(?<dont>{DONT_RE})"))?;
+        let combo_re = Regex::new(&format!(
+            "(?<mul>{MUL_RE})|(?<do>{DO_RE})|(?<dont>{DONT_RE})"
+        ))?;
         let input = parse_input("d3-p1.txt")?;
 
         // use the match set for the first pass to figure out enabled/disabled; if
@@ -52,9 +56,9 @@ mod p2 {
                 if enabled {
                     muls.push((a, b));
                 }
-            }  else if let Some(_do) = caps.name("do") {
+            } else if let Some(_do) = caps.name("do") {
                 enabled = true;
-            } else if let Some (_dont) = caps.name("dont") {
+            } else if let Some(_dont) = caps.name("dont") {
                 enabled = false;
             }
         }

@@ -1,13 +1,15 @@
 use std::{
-    collections::HashSet, fs::File, io::{BufRead, BufReader}, path::{Path, PathBuf}, usize
+    collections::HashSet,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+    usize,
 };
 
 type TopoMap = Vec<Vec<u8>>;
 
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<TopoMap> {
-    let full_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let full_path = PathBuf::from(".").join("inputs").join(path);
     let f = File::open(full_path)?;
     let reader = BufReader::new(f);
     let topo: TopoMap = reader
@@ -19,16 +21,25 @@ fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<TopoMap> {
 }
 
 fn trailheads_for_map(map: &TopoMap) -> Vec<(usize, usize)> {
-    map.iter().enumerate().map(|(row_idx, row)| row.iter().enumerate().filter_map(move |(col_idx, b)| {
-        if *b == 0 {
-            Some((row_idx, col_idx))
-        } else {
-            None
-        }
-    })).flatten().collect()
+    map.iter()
+        .enumerate()
+        .map(|(row_idx, row)| {
+            row.iter().enumerate().filter_map(move |(col_idx, b)| {
+                if *b == 0 {
+                    Some((row_idx, col_idx))
+                } else {
+                    None
+                }
+            })
+        })
+        .flatten()
+        .collect()
 }
 
-fn valid_position(map: &TopoMap, position: (Option<usize>, Option<usize>)) -> Option<(usize, usize)> {
+fn valid_position(
+    map: &TopoMap,
+    position: (Option<usize>, Option<usize>),
+) -> Option<(usize, usize)> {
     let (Some(row), Some(col)) = position else {
         return None;
     };
@@ -40,7 +51,11 @@ fn valid_position(map: &TopoMap, position: (Option<usize>, Option<usize>)) -> Op
     }
 }
 
-fn find_walkable_trails(map: &TopoMap, level: u8, position: (usize, usize)) -> HashSet<(usize, usize)> {
+fn find_walkable_trails(
+    map: &TopoMap,
+    level: u8,
+    position: (usize, usize),
+) -> HashSet<(usize, usize)> {
     let elevation = map[position.0][position.1];
     let mut res = HashSet::new();
 
@@ -127,7 +142,6 @@ fn main() -> anyhow::Result<()> {
     }
     let sum: usize = trailheads.iter().map(|th| score_trailhead(&map, *th)).sum();
     println!("Total Score: {sum}");
-
 
     // By Rating (Part 2)
     for trailhead in trailheads.iter() {

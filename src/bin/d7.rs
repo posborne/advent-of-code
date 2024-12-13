@@ -10,7 +10,9 @@
 // 292: 11 6 16 20
 
 use std::{
-    fs::File, io::{BufRead, BufReader}, path::{Path, PathBuf}
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -75,21 +77,24 @@ impl Input {
                         //print!(" + {operand}");
                         computed_res = match computed_res.checked_add(*operand) {
                             Some(res) => res,
-                            None => { continue 'ordering } // overflow
+                            None => continue 'ordering, // overflow
                         };
                     }
                     Operator::Mul => {
                         //print!(" * {operand}");
                         computed_res = match computed_res.checked_mul(*operand) {
                             Some(res) => res,
-                            None => { continue 'ordering } // overflow
+                            None => continue 'ordering, // overflow
                         }
                     }
                     Operator::Concat => {
                         let concatted_str = format!("{computed_res}{operand}");
                         computed_res = match concatted_str.parse::<u64>() {
                             Ok(v) => v,
-                            Err(e) => { eprintln!("{e} - {concatted_str:?}"); continue 'ordering } // overflow probably
+                            Err(e) => {
+                                eprintln!("{e} - {concatted_str:?}");
+                                continue 'ordering;
+                            } // overflow probably
                         };
                     }
                 }
@@ -106,9 +111,7 @@ impl Input {
 }
 
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<Input>> {
-    let full_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let full_path = PathBuf::from(".").join("inputs").join(path);
     let f = File::open(full_path)?;
     let reader = BufReader::new(f);
     let parsed_inputs = reader
@@ -152,7 +155,6 @@ fn main() -> anyhow::Result<()> {
         })
         .sum();
     println!("Part 2 - Functional Sum: {functional_res_sum:?}");
-
 
     Ok(())
 }

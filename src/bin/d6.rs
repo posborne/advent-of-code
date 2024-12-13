@@ -103,9 +103,7 @@ impl Display for MapPosition {
 }
 
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Map> {
-    let full_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let full_path = PathBuf::from(".").join("inputs").join(path);
     let f = File::open(full_path)?;
     let reader = BufReader::new(f);
     let map = reader
@@ -279,7 +277,7 @@ fn find_single_obstacle_positions(
         if res.is_none() {
             single_obstacle_positions.push((row, col, map));
         }
-    } 
+    }
 
     single_obstacle_positions
 }
@@ -296,7 +294,10 @@ fn main() -> anyhow::Result<()> {
     println!("");
     println!("");
     let obstacle_sim_results = find_single_obstacle_positions(&orig_map, &map_with_visits);
-    println!("Single obstacle scenario count: {}", obstacle_sim_results.len());
+    println!(
+        "Single obstacle scenario count: {}",
+        obstacle_sim_results.len()
+    );
 
     Ok(())
 }

@@ -8,9 +8,7 @@ fn parse_input<P>(path: P) -> anyhow::Result<Vec<String>>
 where
     P: AsRef<Path>,
 {
-    let path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let path = PathBuf::from(".").join("inputs").join(path);
     let f = File::open(path)?;
     let reader = BufReader::new(f);
     let puzzle = reader

@@ -14,9 +14,7 @@ enum AntMapPosition {
 }
 
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<Vec<AntMapPosition>>> {
-    let full_path = PathBuf::from(".")
-        .join("inputs")
-        .join(path);
+    let full_path = PathBuf::from(".").join("inputs").join(path);
     let f = File::open(full_path)?;
     let reader = BufReader::new(f);
     let positions = reader
