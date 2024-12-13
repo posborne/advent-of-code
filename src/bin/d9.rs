@@ -52,7 +52,7 @@ impl DiskMap {
 }
 
 fn parse_diskmap<P: AsRef<Path>>(path: P) -> anyhow::Result<DiskMap> {
-    let full_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let full_path = PathBuf::from(".")
         .join("inputs")
         .join(path);
     let contents = std::fs::read_to_string(full_path)?;

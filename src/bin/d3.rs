@@ -5,7 +5,7 @@ const DO_RE: &str = r"do\(\)";
 const DONT_RE: &str = r"don\'t\(\)";
 
 fn parse_input<P: AsRef<Path>>(input_path: P) -> anyhow::Result<String> {
-    let full_input_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("inputs").join(input_path);
+    let full_input_path = PathBuf::from(".").join("inputs").join(input_path);
     let f = File::open(full_input_path)?;
     let mut reader = BufReader::new(f);
     Ok(std::io::read_to_string(&mut reader)?)

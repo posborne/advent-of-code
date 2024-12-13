@@ -25,7 +25,7 @@ struct Inputs {
 }
 
 fn parse_inputs<P: AsRef<Path>>(path: P) -> anyhow::Result<Inputs> {
-    let full_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let full_path = PathBuf::from(".")
         .join("inputs")
         .join(path);
     let f = File::open(full_path)?;

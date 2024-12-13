@@ -7,7 +7,7 @@ use std::{
 
 fn parse_input<P: AsRef<Path>>(file: P) -> anyhow::Result<Vec<(i32, i32)>> {
     let f = File::open(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        PathBuf::from(".")
             .join("inputs")
             .join(file.as_ref()),
     )?;

@@ -6,7 +6,7 @@ use std::{
 // we want some kind of balanced binary tree sort of thing...  That may not
 // be right, however, so let's send it naive first.
 fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<usize>> {
-    let full_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let full_path = PathBuf::from(".")
         .join("inputs")
         .join(path);
     let s = std::io::read_to_string(File::open(full_path)?)?;
