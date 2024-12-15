@@ -2,6 +2,12 @@ use std::{fmt::Display, path::Path};
 
 use aoc::input_lines;
 
+#[derive(Debug, Clone, Copy)]
+struct Position {
+    x: usize,
+    y: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Object {
     Empty,
@@ -83,17 +89,22 @@ fn parse_input<P: AsRef<Path>>(path: P) -> anyhow::Result<(Map, Motions)> {
     }
 
     // Parse the robot directions
-    let movements_line = lines.next().unwrap();
-    let movements: Vec<Movement> = movements_line.chars().map(|c| Movement::from_char(c)).collect();
+    let mut movements = Vec::new();
+    for movements_line in lines {
+        movements.extend(movements_line.chars().map(|c| Movement::from_char(c)));
+    }
 
     Ok((map, movements))
 }
 
-fn find_robot(map: &Map) -> (usize, usize) {
+fn find_robot(map: &Map) -> Position {
     for (row_idx, row) in map.iter().enumerate() {
         for (col_idx, obj) in row.iter().enumerate() {
             if *obj == Object::Robot {
-                return (row_idx, col_idx);
+                return Position {
+                    x: col_idx,
+                    y: row_idx,
+                }
             }
         }
     }
@@ -128,6 +139,10 @@ fn shift_boxes(map: &mut Map, box_x: usize, box_y: usize, delta_x: isize, delta_
     }
 }
 
+fn clear_screen() {
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+}
+
 fn print_map(map: &Map) {
     for row in map.iter() {
         for obj in row {
@@ -139,7 +154,7 @@ fn print_map(map: &Map) {
 
 fn simulate(map: &mut Map, movements: &[Movement]) {
     let mut robo = find_robot(map);
-    for movement in movements {
+    for (i, movement) in movements.iter().enumerate() {
         let (delta_x, delta_y) = match movement {
             Movement::Up => (0, -1),
             Movement::Down => (0, 1),
@@ -147,14 +162,15 @@ fn simulate(map: &mut Map, movements: &[Movement]) {
             Movement::Right => (1, 0),
         };
 
-        let next_y = (robo.1 as isize + delta_y) as usize;
-        let next_x = (robo.0 as isize + delta_x) as usize;
+        let next_y = (robo.y as isize + delta_y) as usize;
+        let next_x = (robo.x as isize + delta_x) as usize;
         let obj_at_next_pos = map[next_y][next_x];
         match obj_at_next_pos {
             Object::Empty => {
-                map[robo.1][robo.0] = Object::Empty;
-                robo = (next_x, next_y);
-                map[robo.1][robo.0] = Object::Robot;
+                map[robo.y][robo.x] = Object::Empty;
+                robo.x = next_x;
+                robo.y = next_y;
+                map[robo.y][robo.x] = Object::Robot;
             }
             Object::Wall => {
                 // do nothing; robot doesn't get to move.
@@ -163,32 +179,46 @@ fn simulate(map: &mut Map, movements: &[Movement]) {
                 // potentially shift box(es) by delta
                 let shifted = shift_boxes(map, next_x, next_y, delta_x, delta_y);
                 if shifted {
-                    map[robo.1][robo.0] = Object::Empty;
-                    robo = (next_x, next_y);
-                    map[robo.1][robo.0] = Object::Robot;
+                    map[robo.y][robo.x] = Object::Empty;
+                    robo.x = next_x;
+                    robo.y = next_y;
+                    map[robo.y][robo.x] = Object::Robot;
                 }
             }
             Object::Robot => {
-                println!("Roboception!");
+                panic!("Roboception!");
             }
         }
 
-        println!("\n== Movement={movement} ==");
+        println!("Enter for next...");
+        let mut _s = String::new();
+        // std::io::stdin().read_line(&mut _s).unwrap();
+        clear_screen();
+        println!("Movement    {movement} ({} / {})", i + 1, movements.len());
         print_map(map);
     }
 }
 
-fn main() -> anyhow::Result<()> {
-    let (mut map, movements) = parse_input("d15-example2.txt")?;
-    print_map(&map);
-
-    print!("Motions: ");
-    for motion in movements.iter() {
-        print!("{motion}");
+fn compute_gps(map: &Map) -> usize {
+    let mut gps_sum: usize = 0;
+    for y in 0..map.len() {
+        for x in 0..map[y].len() {
+            if map[y][x] == Object::Box {
+                gps_sum += 100 * y + x;
+            }
+        }
     }
-    println!("");
+    gps_sum
+}
 
+fn main() -> anyhow::Result<()> {
+    let (mut map, movements) = parse_input("d15.txt")?;
+    clear_screen();
+    println!("Initial Map ({} moves)", movements.len());
+    print_map(&map);
     simulate(&mut map, &movements);
+
+    println!("GPS: {}", compute_gps(&map));
 
     Ok(())
 }
