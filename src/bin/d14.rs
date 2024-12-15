@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use aoc::input_lines;
 use regex::Regex;
@@ -74,6 +74,13 @@ fn simulate(robots: &mut [Robot], xmax: isize /* cols */, ymax: isize /* rows */
     positions
 }
 
+fn is_christmas_tree(positions: &[RobotPosition], _xmax: isize, _ymax: isize) -> bool {
+    // let's guess that maybe an interation where there are no overlapping robots
+    // might be an easter egg given the density of bots...
+    let pos_set: HashSet::<(isize, isize)> = positions.iter().map(|p| (p.x, p.y)).collect();
+    pos_set.len() == positions.len()
+}
+
 fn compute_safety_factory(positions: &[RobotPosition], xmax: isize, ymax: isize) -> usize {
     let mut tl = 0;
     let mut tr = 0;
@@ -110,8 +117,13 @@ fn main() -> anyhow::Result<()> {
     let mut robots = parse_input("d14.txt")?;
     let xmax = 101;
     let ymax = 103;
-    let seconds = 100;
-    let positions = simulate(&mut robots, xmax, ymax, seconds);
+
+    let mut seconds = 1;
+    let mut positions = simulate(&mut robots, xmax, ymax, seconds);
+    while !is_christmas_tree(&positions, xmax, ymax) {
+        positions = simulate(&mut robots, xmax, ymax, 1);
+        seconds += 1;
+    }
     println!("\nSeconds={seconds}, Positions={positions:?}");
     for y in 0..ymax {
         for x in 0..xmax {
@@ -126,5 +138,6 @@ fn main() -> anyhow::Result<()> {
     }
     let sf = compute_safety_factory(&positions, xmax, ymax);
     println!("Safety Factory: {sf}");
+    println!("Easter Egg @ {seconds} seconds");
     Ok(())
 }
