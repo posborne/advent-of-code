@@ -40,6 +40,25 @@ impl Direction {
             Self::Right => '>',
         }
     }
+
+    fn opposite_direction(&self) -> Direction {
+        match self {
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+        }
+    }
+
+    fn turns_to_face(&self, other: Direction) -> usize {
+        if self == &other {
+            0
+        } else if self.opposite_direction() == other {
+            2
+        } else {
+            1
+        }
+    }
 }
 
 impl MapItem {
@@ -163,11 +182,8 @@ fn check_direction(
         return None; // nothing pushed into costs
     }
 
-    let this_cost: usize = if direction == rudolph.direction {
-        1
-    } else {
-        1001
-    };
+    let turns = rudolph.direction.turns_to_face(direction);
+    let this_cost = 1000 * turns + 1;
 
     let mut map = map.clone();
     map[y][x] = MapItem::Reindeer(direction);
