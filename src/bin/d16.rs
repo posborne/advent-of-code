@@ -211,10 +211,11 @@ mod dijkstra {
         Direction::Right,
     ];
 
-    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-    struct State {
-        position: Vertex,
-        cost: usize,
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct State {
+        pub path: Vec<Vertex>,
+        pub position: Vertex,
+        pub cost: usize,
     }
 
     impl Ord for State {
@@ -290,7 +291,7 @@ mod dijkstra {
     // wouldn't ever realistically be selected.
     pub fn find_optimal_path_using_dijkstra(
         map: &Map,
-    ) -> Option<(usize, HashMap<Vertex, Vertex>, Vertex)> {
+    ) -> Option<Vec<State>> {
         let adjacencies = build_adjancy_map(map);
         let mut dist: HashMap<Vertex, usize> = HashMap::new();
         let mut prev: HashMap<Vertex, Vertex> = HashMap::new();
@@ -308,22 +309,35 @@ mod dijkstra {
         };
         dist.insert(rudolph_position, 0);
         pq.push(State {
+            path: Vec::from(&[rudolph_position]),
             position: rudolph_position,
             cost: 0,
         });
 
+        let mut solutions: Vec<State> = Vec::new();
+
         // examine the "frontier" with lowest cost nodes first
-        while let Some(State { position, cost }) = pq.pop() {
+        while let Some(State { position, cost, path }) = pq.pop() {
             let Vertex { x, y, .. } = position;
 
             // If we've reached the end, we've found an optimal route; for part
             // 2 we want to find the count of spots along any of the optimal
             // routes.
             if map[y][x] == MapItem::End {
-                return Some((cost, prev, position));
+                if solutions.is_empty() || cost == solutions[0].cost {
+                    solutions.push(State {
+                        path,
+                        position,
+                        cost,
+                    });
+                    continue;
+                } else {
+                    break;
+                }
             }
 
-            // If we've found a better way, don't use this one
+            // If we've found a better way, don't use this one but if it is
+            // equivalent or the same, continue
             if cost > dist[&position] {
                 continue;
             }
@@ -331,21 +345,27 @@ mod dijkstra {
             // for each adjacent node (which we can find out by consulting the map),
             // see if there's a lower cost route.
             for edge in adjacencies[&position].iter() {
+                let mut new_path = path.clone();
+                new_path.push(edge.next_position);
                 let next = State {
+                    path: new_path,
                     position: edge.next_position,
                     cost: edge.cost + cost,
                 };
 
-                if next.cost < dist[&next.position] {
-                    pq.push(next);
+                if next.cost <= dist[&next.position] {
                     dist.insert(next.position, next.cost);
                     prev.insert(next.position, position);
+                    pq.push(next);
                 }
             }
         }
 
-        // Not reachable
-        None
+        if solutions.len() > 0 {
+            Some(solutions)
+        } else {
+            None
+        }
     }
 }
 
@@ -368,14 +388,12 @@ fn cli() -> &'static Cli {
 
 fn main() -> anyhow::Result<()> {
     let map = parse_input(&cli().input)?;
-    let (optimal_cost, prev_map, finish) =
-        dijkstra::find_optimal_path_using_dijkstra(&map).unwrap();
-    let mut cur = Some(finish);
-    let mut path: Vec<Vertex> = Vec::new();
-    while let Some(v) = cur {
-        path.push(v);
-        cur = prev_map.get(&v).cloned();
-    }
+
+    let solutions = dijkstra::find_optimal_path_using_dijkstra(&map).unwrap();
+    let paths: Vec<Vec<Vertex>> = solutions.iter().map(|sol| sol.path.clone()).collect();
+    let unique_locations: HashSet<(usize, usize)> = paths.iter().flat_map(|p| p.iter().map(|v| (v.x, v.y))).collect();
+
+    println!("Paths: {:?}", paths.len());
 
     for (y, row) in map.iter().enumerate() {
         for (x, entry) in row.iter().enumerate() {
@@ -383,7 +401,7 @@ fn main() -> anyhow::Result<()> {
                 .iter()
                 .filter(|&&d| {
                     let key = Vertex { x, y, direction: d };
-                    path.contains(&key)
+                    paths.iter().filter(|p| p.contains(&key)).count() > 0
                 })
                 .cloned()
                 .collect();
@@ -396,6 +414,8 @@ fn main() -> anyhow::Result<()> {
         println!("");
     }
 
-    println!("Optimal Path Cost: {optimal_cost:?}");
+    println!("Optimal Path Cost: {}", solutions[0].cost);
+    println!("Good Picnic Spots: {}", unique_locations.len());
+
     Ok(())
 }
