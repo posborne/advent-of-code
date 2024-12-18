@@ -9,6 +9,7 @@ use std::{
 use aoc::input_lines;
 use clap::Parser;
 use colored::Colorize;
+use dijkstra::{Vertex, DIRECTIONS};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum MapItem {
@@ -19,7 +20,7 @@ enum MapItem {
     Reindeer(HashSet<Direction>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
 enum Direction {
     Up,
     Down,
@@ -41,15 +42,6 @@ impl Direction {
             Self::Down => 'v',
             Self::Left => '<',
             Self::Right => '>',
-        }
-    }
-
-    fn idx(&self) -> usize {
-        match self {
-            Self::Up => 0,
-            Self::Down => 1,
-            Self::Left => 2,
-            Self::Right => 3,
         }
     }
 
@@ -182,24 +174,22 @@ fn find_rudolph(map: &Map) -> Reindeer {
 }
 
 mod dijkstra {
-    use std::collections::BinaryHeap;
+    use std::{collections::BinaryHeap, hash::Hash};
 
     use super::*;
 
-    #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-    struct Vertex {
-        x: usize,
-        y: usize,
-        direction: Direction,
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct Vertex {
+        pub x: usize,
+        pub y: usize,
+        pub direction: Direction,
     }
 
     impl Ord for Vertex {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            other
-                .x
-                .cmp(&self.x)
-                .then(other.y.cmp(&self.y))
-                .then(other.direction.idx().cmp(&self.direction.idx()))
+            self.x.cmp(&other.x)
+                .then_with(|| self.y.cmp(&other.y))
+                .then_with(|| self.direction.cmp(&other.direction))
         }
     }
 
@@ -214,7 +204,7 @@ mod dijkstra {
         cost: usize,
     }
 
-    const DIRECTIONS: [Direction; 4] = [
+    pub const DIRECTIONS: [Direction; 4] = [
         Direction::Up,
         Direction::Down,
         Direction::Left,
@@ -242,28 +232,7 @@ mod dijkstra {
         }
     }
 
-    // Using Dijkstra's algorithm to find the lowest cost path
-    //
-    // Dijkstra's algorithm, at first blush, sounds like a great fit
-    // for a maze solver.  The cost of changing directions, however, puts
-    // a little wrench into things.
-    //
-    // The first step is to build the directed graph which we could do, but
-    // we're going to try to work directly off the map structure as part of
-    // this to avoid that prework to see how that treats us.
-    pub fn find_optimal_path_using_dijkstra(map: &Map) -> Option<usize> {
-        // For our input problem we model the maze in 3d space where our dimensions
-        // are:
-        // - y: column
-        // - x: row
-        // - z: The direction we are facing when we moved to the vertex
-        //
-        // The weight on the edges between adjacent nodes in the graph are the associated
-        // cost which will be 1 plus the 1000 * number of turns to get to the required z
-        // value for the node.  We include the modeling of a direct move backwards (though
-        // we could safely preclude this case) as this will always have a cost of 2002 and
-        // wouldn't ever realistically be selected.
-
+    fn build_adjancy_map(map: &Map) -> HashMap<Vertex, Vec<Edge>> {
         let mut adjacencies: HashMap<Vertex, Vec<Edge>> = HashMap::new();
         for (y, row) in map.iter().enumerate() {
             for (x, val) in row.iter().enumerate() {
@@ -299,8 +268,32 @@ mod dijkstra {
                 }
             }
         }
+        adjacencies
+    }
 
+    // Using Dijkstra's algorithm to find the lowest cost path
+    //
+    // Dijkstra's algorithm, at first blush, sounds like a great fit
+    // for a maze solver.  The cost of changing directions, however, puts
+    // a little wrench into things.
+    //
+    // For our input problem we model the maze in 3d space where our dimensions
+    // are:
+    // - y: column
+    // - x: row
+    // - z: The direction we are facing when we moved to the vertex
+    //
+    // The weight on the edges between adjacent nodes in the graph are the associated
+    // cost which will be 1 plus the 1000 * number of turns to get to the required z
+    // value for the node.  We include the modeling of a direct move backwards (though
+    // we could safely preclude this case) as this will always have a cost of 2002 and
+    // wouldn't ever realistically be selected.
+    pub fn find_optimal_path_using_dijkstra(
+        map: &Map,
+    ) -> Option<(usize, HashMap<Vertex, Vertex>, Vertex)> {
+        let adjacencies = build_adjancy_map(map);
         let mut dist: HashMap<Vertex, usize> = HashMap::new();
+        let mut prev: HashMap<Vertex, Vertex> = HashMap::new();
         let mut pq = BinaryHeap::new();
 
         for vertex in adjacencies.keys() {
@@ -323,9 +316,11 @@ mod dijkstra {
         while let Some(State { position, cost }) = pq.pop() {
             let Vertex { x, y, .. } = position;
 
-            // If we've reached the end, we've found the optimal route.
+            // If we've reached the end, we've found an optimal route; for part
+            // 2 we want to find the count of spots along any of the optimal
+            // routes.
             if map[y][x] == MapItem::End {
-                return Some(cost);
+                return Some((cost, prev, position));
             }
 
             // If we've found a better way, don't use this one
@@ -344,6 +339,7 @@ mod dijkstra {
                 if next.cost < dist[&next.position] {
                     pq.push(next);
                     dist.insert(next.position, next.cost);
+                    prev.insert(next.position, position);
                 }
             }
         }
@@ -372,7 +368,34 @@ fn cli() -> &'static Cli {
 
 fn main() -> anyhow::Result<()> {
     let map = parse_input(&cli().input)?;
-    let optimal_cost = dijkstra::find_optimal_path_using_dijkstra(&map);
+    let (optimal_cost, prev_map, finish) =
+        dijkstra::find_optimal_path_using_dijkstra(&map).unwrap();
+    let mut cur = Some(finish);
+    let mut path: Vec<Vertex> = Vec::new();
+    while let Some(v) = cur {
+        path.push(v);
+        cur = prev_map.get(&v).cloned();
+    }
+
+    for (y, row) in map.iter().enumerate() {
+        for (x, entry) in row.iter().enumerate() {
+            let directions: Vec<Direction> = DIRECTIONS
+                .iter()
+                .filter(|&&d| {
+                    let key = Vertex { x, y, direction: d };
+                    path.contains(&key)
+                })
+                .cloned()
+                .collect();
+            match directions.len() {
+                0 => print!("{entry}"),
+                1 => print!("{}", format!("{}", directions[0].as_char()).blue()),
+                _ => print!("{}", format!("+").red()),
+            }
+        }
+        println!("");
+    }
+
     println!("Optimal Path Cost: {optimal_cost:?}");
     Ok(())
 }
