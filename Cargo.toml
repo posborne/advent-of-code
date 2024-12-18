@@ -6,7 +6,8 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0"
-clap = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+colored = "2.2"
 enumset = "1.1"
 itertools = "0.13"
 regex = "1.11"
