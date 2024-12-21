@@ -104,7 +104,8 @@ impl Default for Node {
 
 impl Ord for Node {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.estimated_cost_to_goal.cmp(&other.estimated_cost_to_goal)
+        other.cost.cmp(&self.cost)
+            .then(other.estimated_total_cost.cmp(&self.estimated_total_cost))
             .then(self.position.cmp(&other.position))
     }
 }
@@ -145,7 +146,7 @@ fn solve_maze_using_astar(map: &[Vec<MapEntry>]) -> Option<VecDeque<Position>> {
 
     while let Some(node) = frontier.pop() {
         let Position { x, y } = node.position;
-        visited.insert(node.position);
+        println!("{:?}", node.position);
 
         // Are we at the goal?
         if (x, y) == (goal.x, goal.y) {
@@ -177,17 +178,19 @@ fn solve_maze_using_astar(map: &[Vec<MapEntry>]) -> Option<VecDeque<Position>> {
                 prev: Some(prev),
             };
 
-            if let Some(existing_in_frontier) = frontier
+            // if there's any existing elements with a cost <= the neighbor, don't add
+            // the neighbor to the frontier.
+            if frontier
                 .iter()
                 .filter(|n| n.position == neigh_position)
-                .nth(0)
+                .filter(|n| n.cost < neigh_node.cost)
+                .count() > 0
             {
-                if neigh_node.cost > existing_in_frontier.cost {
-                    continue; // skip this node withotu adding to frontier, dead end path to the node
-                }
+                continue;
             }
 
             // add this node to the frontier in priority order (see Ord/PartialOrd)
+            visited.insert(neigh_node.position);
             frontier.push(neigh_node);
         }
     }
