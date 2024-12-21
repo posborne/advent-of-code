@@ -146,7 +146,6 @@ fn solve_maze_using_astar(map: &[Vec<MapEntry>]) -> Option<VecDeque<Position>> {
 
     while let Some(node) = frontier.pop() {
         let Position { x, y } = node.position;
-        println!("{:?}", node.position);
 
         // Are we at the goal?
         if (x, y) == (goal.x, goal.y) {
@@ -198,22 +197,16 @@ fn solve_maze_using_astar(map: &[Vec<MapEntry>]) -> Option<VecDeque<Position>> {
     None
 }
 
-fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    let corruption = parse_input(cli.input)?;
-    let mut map: Vec<Vec<MapEntry>> = (0..cli.dimensions)
-        .map(|_y| (0..cli.dimensions).map(|_x| MapEntry::Open).collect())
-        .collect();
-
-    for pos in corruption.iter().take(cli.bytes) {
-        map[pos.y][pos.x] = MapEntry::Corrupted;
+fn print_map_with_path(map: &[Vec<MapEntry>], path: &VecDeque<Position>) {
+    print!("  ");
+    for x in 0..map.len() {
+        print!("{}", x % 10);
     }
+    println!("");
 
-    let path = solve_maze_using_astar(&map).expect("Expected Solution");
-    println!("Path: {:?}", path);
-
-    for y in 0..cli.dimensions {
-        for x in 0..cli.dimensions {
+    for y in 0..map.len() {
+        print!("{} ", y % 10);
+        for x in 0..map.len() {
             let entry = map[y][x];
             let pos = Position { x, y };
             let in_path = path.contains(&pos);
@@ -226,9 +219,79 @@ fn main() -> anyhow::Result<()> {
         }
         println!("");
     }
+}
+
+fn part2() -> anyhow::Result<()> {
+    // In part 2, we need to find the position of the first falling byte
+    // that will block our path.  We know from part 1 that we are OK up
+    // until byte 1024 that we can still make it all the way, but we
+    // don't know beyond that point.
+    //
+    // We could just try to do this by brute, but it's going to be expensive.
+    // Let's try doing a binary search over the maze set instead.
+
+    let cli = Cli::parse();
+    let corruption = parse_input(cli.input)?;
+    let base_map: Vec<Vec<MapEntry>> = (0..cli.dimensions)
+        .map(|_y| (0..cli.dimensions).map(|_x| MapEntry::Open).collect())
+        .collect();
+
+    let mut low = 1024;
+    let mut high = corruption.len();
+    while high - low > 1 {
+        println!("low={low}, high={high}");
+
+        // select our candidate in the middle of the range
+        let candidate = low + (high - low) / 2;
+
+        // corrupt our map with that amount of corruption
+        let mut map = base_map.clone();
+        for pos in corruption.iter().take(candidate) {
+            map[pos.y][pos.x] = MapEntry::Corrupted;
+        }
+
+        // Now, see if a* can come up with a solution.
+        let solvable = solve_maze_using_astar(&map);
+        if let Some(solution) = solvable {
+            print_map_with_path(&map, &solution);
+            println!("   Yep ({candidate}) in {}", solution.len() - 1);
+            low = candidate;
+        } else {
+            println!("   Nope ({candidate})");
+            high = candidate;
+        }
+    }
+
+    // The index in corruption ends up being the lower bound with how the indexing
+    // workings out, etc.
+    println!("Problem Index = {low} - {:?}", corruption[low]);
+
+    Ok(())
+}
+
+fn part1() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let corruption = parse_input(cli.input)?;
+    let mut map: Vec<Vec<MapEntry>> = (0..cli.dimensions)
+        .map(|_y| (0..cli.dimensions).map(|_x| MapEntry::Open).collect())
+        .collect();
+
+    for pos in corruption.iter().take(cli.bytes) {
+        map[pos.y][pos.x] = MapEntry::Corrupted;
+    }
+
+    let path = solve_maze_using_astar(&map).expect("Expected Solution");
+
+    print_map_with_path(&map, &path);
 
     // The cost is the path length - 1 (the # of moves)
     println!("Cost: {}", path.len() - 1);
 
+    Ok(())
+}
+
+fn main() -> anyhow::Result<()> {
+    part1()?;
+    part2()?;
     Ok(())
 }
