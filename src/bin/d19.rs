@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use aoc::input_lines;
 use clap::Parser;
@@ -29,20 +29,38 @@ struct Cli {
     input: String,
 }
 
-fn pattern_possible(pattern: &str, sorted_towels: &[&str], depth: usize) -> bool {
+type Cache<'a> = HashMap<&'a str, usize>;
+
+fn patterns_possible<'a>(
+    pattern: &'a str,
+    sorted_towels: &'a [&'a str],
+    depth: usize,
+    verbose: bool,
+    cache: &mut Cache<'a>,
+) -> usize {
     // base case, the remaining pattern is an available towel; if not
     // then we know that the longest matching subpattern would at most
     // be the length of the closest match (though might be none).
+    if verbose {
+        for _ in 0..depth {
+            print!("  ");
+        }
+        println!("pattern: {pattern}");
+    }
 
-    for _ in 0..depth { print!("  "); }
-    println!("pattern: {pattern}");
+    if let Some(cached) = cache.get(&pattern) {
+        return *cached;
+    }
+
+    let mut possible = 0;
 
     // base case
     let closest_towel = match sorted_towels.binary_search(&pattern) {
-        Ok(_) => return true,
-        Err(idx) => {
+        Ok(idx) => {
+            possible += 1;
             sorted_towels[idx.saturating_add_signed(-1)]
         }
+        Err(idx) => sorted_towels[idx.saturating_add_signed(-1)],
     };
 
     let in_common = pattern
@@ -54,20 +72,28 @@ fn pattern_possible(pattern: &str, sorted_towels: &[&str], depth: usize) -> bool
     // work backwards from the largest possible subpattern
     for pivot in (0..in_common).rev() {
         let (subpattern, remainder) = pattern.split_at(pivot + 1);
-        for _ in 0..depth { print!(" "); }
-        println!("sub: {subpattern}/{remainder}");
+
+        if verbose {
+            for _ in 0..depth {
+                print!(" ");
+            }
+            println!("sub: {subpattern}/{remainder}");
+        }
 
         if !sorted_towels.binary_search(&subpattern).is_ok() {
             continue;
         }
 
         // we matched a subpattern, if the rest works out we're home free!
-        if pattern_possible(remainder, sorted_towels, depth + 1) {
-            return true;
+        let remaining_possible =
+            patterns_possible(remainder, sorted_towels, depth + 1, verbose, cache);
+        if remaining_possible > 0 {
+            possible += remaining_possible;
         }
     }
 
-    return false;
+    cache.insert(pattern, possible);
+    return possible;
 }
 
 fn main() -> anyhow::Result<()> {
@@ -89,17 +115,27 @@ fn main() -> anyhow::Result<()> {
     // This would work greedily on larger substrings until none can be found and then
     // back off again; this would recurse but be somewhat limited by how long of an
     // pattern we're dealing with (at least for p1).
-    let mut patterns_possible = 0;
+    let mut ok_patterns = 0;
+    let mut patterns_count = 0;
     let mut towels_sorted: Vec<&str> = inputs.towels.iter().map(|t| t.as_ref()).collect();
     towels_sorted.sort();
     println!("Sorted: {towels_sorted:?}\n\n");
     for pattern in inputs.patterns.iter() {
-        if pattern_possible(pattern, &towels_sorted, 0) {
-            patterns_possible += 1;
+        println!("Working on pattern: {pattern}");
+        let mut cache = Default::default();
+        let patterns = patterns_possible(pattern, &towels_sorted, 0, false, &mut cache);
+        if patterns > 0 {
+            ok_patterns += 1;
         }
+        patterns_count += patterns;
     }
 
-    println!("Possible Patterns: {patterns_possible} / {}", inputs.patterns.len());
+    println!("Note: 482106311433668 is too low");
+    println!(
+        "Passing Patterns: {ok_patterns} / {}",
+        inputs.patterns.len()
+    );
+    println!("Possible Patterns: {patterns_count}");
 
     Ok(())
 }
