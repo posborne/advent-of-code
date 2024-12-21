@@ -1,8 +1,7 @@
-use std::{fmt::Display, ops::Deref, path::Path};
+use std::{ops::Deref, path::Path};
 
 use aoc::input_lines;
 use clap::Parser;
-use rayon::prelude::*;
 
 #[derive(Debug)]
 #[repr(u8)]
