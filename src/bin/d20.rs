@@ -1,5 +1,5 @@
 use std::{
-    collections::{BinaryHeap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt::Display,
     path::Path,
 };
@@ -108,105 +108,9 @@ struct Cheat {
     end: Position,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Node {
-    position: Position,
-    cost: usize,
-    cheat: Option<Cheat>,
-}
-
 const DELTAS: [(isize, isize); 4] = [(0, 1), (0, -1), (1, 0), (-1, 0)];
-
-fn next_position(
-    x: usize,
-    y: usize,
-    dx: isize,
-    dy: isize,
-    rows: usize,
-    cols: usize,
-) -> Option<(usize, usize)> {
-    let nx = x.checked_add_signed(dx)?;
-    let ny = y.checked_add_signed(dy)?;
-    if nx >= rows || ny >= cols {
-        None
-    } else {
-        Some((nx, ny))
-    }
-}
-
-impl Node {
-    fn new(x: usize, y: usize) -> Self {
-        Node {
-            position: Position { x, y },
-            cost: 0,
-            cheat: None,
-        }
-    }
-
-    fn neighbors(&self, map: &Map) -> Vec<Node> {
-        let cols = map.entries.len();
-        let rows = map.entries[0].len();
-
-        // just return neighbors that don't involve collisions
-        if self.cheat.is_some() {
-            return DELTAS
-                .into_iter()
-                .filter_map(|(dx, dy)| {
-                    let (x, y) =
-                        next_position(self.position.x, self.position.y, dx, dy, rows, cols)?;
-                    Some(Node {
-                        position: Position { x, y },
-                        cost: self.cost + 1,
-                        cheat: self.cheat.clone(),
-                    })
-                })
-                .collect();
-        }
-
-        // we haven't done collissions yet, so we need to provide both paths that
-        // don't involve collisions and ones that do.
-        DELTAS
-            .into_iter()
-            .filter_map(|(dx, dy)| {
-                let (x, y) = next_position(self.position.x, self.position.y, dx, dy, rows, cols)?;
-                if matches!(map.entries[y][x], MapEntry::Wall) {
-                    let (nx, ny) = next_position(x, y, dx, dy, rows, cols)?;
-                    if matches!(map.entries[ny][nx], MapEntry::Wall) {
-                        None
-                    } else {
-                        Some(Node {
-                            position: Position { x: nx, y: ny },
-                            cost: self.cost + 2,
-                            cheat: Some(Cheat {
-                                start: Position { x, y },
-                                end: Position { x: nx, y: ny },
-                            }),
-                        })
-                    }
-                } else {
-                    Some(Node {
-                        position: Position { x, y },
-                        cost: self.cost + 1,
-                        cheat: self.cheat.clone(),
-                    })
-                }
-            })
-            .collect()
-    }
-}
-
-impl Ord for Node {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.cost
-            .cmp(&other.cost)
-            .then(self.position.cmp(&other.position))
-    }
-}
-
-impl PartialOrd for Node {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
-    }
+fn manhattan_distance(p1: &Position, p2: &Position) -> usize {
+    p1.x.abs_diff(p2.x) + p1.y.abs_diff(p2.y)
 }
 
 fn part1() -> anyhow::Result<()> {
@@ -221,54 +125,83 @@ fn part1() -> anyhow::Result<()> {
     // form of dijkstra's modified to try to track the notion of
     // having cheated in our path with differences in enighbor computation
     // before and after having done a cheat on this pass.
+    //
+    // ---
+    //
+    // Updated thinking:
+    //
+    // After that approach turning into a bit of a quagmire, I think there's
+    // a more straightforward approach (reddit hints reading general tips)
+    // which is to just walk the path and record the distance to the end from
+    // that point.  Then, for each point, see if there is another piece of
+    // road with a manhattan distance of 2 away that has a lower cost; that
+    // difference is the picoseconds saved.
     let cli = Cli::parse();
     let map = parse_input(cli.input)?;
     print_map(&map);
 
-    let mut frontier = BinaryHeap::new();
-    let start_node = Node::new(map.start.x, map.start.y);
-    frontier.push(start_node);
-
-    let mut solutions: Vec<Node> = Vec::new();
-    let mut visited: HashSet<(Position, Option<Cheat>)> = HashSet::new();
-    while let Some(node) = frontier.pop() {
-        // Are we at the end?  Then we have a complete path, record it and
-        // carry on
-        if map.end == node.position {
-            solutions.push(node);
-            continue;
+    // walk the map from the end back to the start with the step
+    // along the way being the cost (which we record)
+    let mut visited: HashSet<Position> = HashSet::new();
+    let mut road_costs: HashMap<Position, usize> = HashMap::new();
+    let mut next_position = Some(map.end);
+    let mut cost = 0;
+    while let Some(position) = next_position {
+        visited.insert(position);
+        road_costs.insert(position, cost);
+        if position == map.start {
+            break;
         }
 
-        let neighbors = node.neighbors(&map);
-        for neighbor in neighbors {
-            if visited.contains(&(neighbor.position, neighbor.cheat.clone())) {
-                continue;
-            }
+        next_position = DELTAS
+            .into_iter()
+            .filter_map(|(dx, dy)| {
+                let x = position.x.checked_add_signed(dx)?;
+                let y = position.y.checked_add_signed(dy)?;
+                let pos = Position { x, y };
+                let entry = map.entries[y][x];
+                if visited.contains(&pos) || !matches!(entry, MapEntry::Road | MapEntry::Start) {
+                    return None;
+                }
+                Some(pos)
+            })
+            .nth(0);
+        cost += 1;
+    }
 
-            visited.insert((neighbor.position, neighbor.cheat.clone()));
-            frontier.push(neighbor);
+    let mut shortcuts: Vec<(Cheat, usize)> = Vec::new();
+    for (position, cost) in road_costs.iter() {
+        for (tpos, tcost) in road_costs.iter() {
+            let dist = manhattan_distance(position, tpos);
+            if dist == 2 && tcost < cost && cost - tcost > 2 {
+                let savings = cost - tcost - 2;
+                let cheat = Cheat {
+                    start: position.clone(),
+                    end: tpos.clone(),
+                };
+                shortcuts.push((cheat, savings))
+            }
         }
     }
 
-    let full_length = map
-        .entries
-        .iter()
-        .flat_map(|r| {
-            r.iter()
-                .filter(|e| matches!(e, MapEntry::Road | MapEntry::End))
-        })
-        .count();
-    println!("Full Cost: {full_length}");
-    let mut solutions_by_cost: HashMap<usize, usize> = HashMap::new();
-    for node in solutions {
-        let saved = full_length - node.cost;
-        let entry = solutions_by_cost.entry(saved).or_default();
+    let mut shortcuts_by_savings: HashMap<usize, usize> = HashMap::new();
+    for (_cheat, cost) in shortcuts {
+        let entry = shortcuts_by_savings.entry(cost).or_default();
         *entry += 1;
     }
 
-    for (cost, solutions) in solutions_by_cost.iter().sorted() {
-        println!("{cost}: {solutions}");
+    for (savings, solutions) in shortcuts_by_savings.iter().sorted() {
+        println!("{savings}: {solutions}");
     }
+
+    let cheats_saving_gt_100: usize = shortcuts_by_savings
+        .iter()
+        .filter(|(savings, _count)| **savings >= 100)
+        .map(|(_savings, count)| *count)
+        .sum();
+
+    println!("Cheats saving >= 100 picoseconds = {cheats_saving_gt_100}");
+
     Ok(())
 }
 
