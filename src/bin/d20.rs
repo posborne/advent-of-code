@@ -100,6 +100,12 @@ fn print_map(map: &Map) {
 struct Cli {
     #[arg(short, long)]
     input: String,
+
+    #[arg(short, long, default_value_t = 100)]
+    threshold_picoseconds: usize,
+
+    #[arg(short, long, default_value_t = 2)]
+    cheat_duration: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -113,7 +119,7 @@ fn manhattan_distance(p1: &Position, p2: &Position) -> usize {
     p1.x.abs_diff(p2.x) + p1.y.abs_diff(p2.y)
 }
 
-fn part1() -> anyhow::Result<()> {
+fn solve() -> anyhow::Result<()> {
     // Part 1 Reasoning:
     //
     // Off the bat, my first idea is to model things using Dijkstra's
@@ -173,8 +179,11 @@ fn part1() -> anyhow::Result<()> {
     for (position, cost) in road_costs.iter() {
         for (tpos, tcost) in road_costs.iter() {
             let dist = manhattan_distance(position, tpos);
-            if dist == 2 && tcost < cost && cost - tcost > 2 {
-                let savings = cost - tcost - 2;
+            if dist <= cli.cheat_duration
+                && tcost < cost
+                && cost - tcost - dist >= cli.threshold_picoseconds
+            {
+                let savings = cost - tcost - dist;
                 let cheat = Cheat {
                     start: position.clone(),
                     end: tpos.clone(),
@@ -194,18 +203,21 @@ fn part1() -> anyhow::Result<()> {
         println!("{savings}: {solutions}");
     }
 
-    let cheats_saving_gt_100: usize = shortcuts_by_savings
+    let cheats_saving_gt_treshold: usize = shortcuts_by_savings
         .iter()
-        .filter(|(savings, _count)| **savings >= 100)
+        .filter(|(savings, _count)| **savings >= cli.threshold_picoseconds)
         .map(|(_savings, count)| *count)
         .sum();
 
-    println!("Cheats saving >= 100 picoseconds = {cheats_saving_gt_100}");
+    println!(
+        "Cheats (duration <= {}) saving >= {} picoseconds = {cheats_saving_gt_treshold}",
+        cli.cheat_duration, cli.threshold_picoseconds
+    );
 
     Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
-    part1()?;
+    solve()?;
     Ok(())
 }
