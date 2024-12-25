@@ -76,3 +76,6 @@ name = "d20"
 
 [[bin]]
 name = "d21"
+
+[[bin]]
+name = "d22"
